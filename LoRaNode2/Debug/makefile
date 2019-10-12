@@ -34,7 +34,7 @@ all: LoRaNode.elf
 LoRaNode.elf: $(OBJS) $(USER_OBJS) ../STM32F446RETx_FLASH.ld
 	@echo 'Building target: $@'
 	@echo 'Invoking: MCU GCC Linker'
-	arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -L"C:\Users\radle\Dropbox\Thesis\LoRaNode2\CMSIS\Lib\GCC" -specs=nosys.specs -specs=nano.specs -T"../STM32F446RETx_FLASH.ld" -Wl,-Map=output.map -Wl,--gc-sections -o "LoRaNode.elf" @"objects.list" $(USER_OBJS) $(LIBS) -lm
+	arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 -L"C:\Users\radle\Dropbox\Thesis\Firmware\LoRaNode2\CMSIS\Lib\GCC" -specs=nosys.specs -specs=nano.specs -T"../STM32F446RETx_FLASH.ld" -Wl,-Map=output.map -Wl,--gc-sections -o "LoRaNode.elf" @"objects.list" $(USER_OBJS) $(LIBS) -lm
 	@echo 'Finished building target: $@'
 	@echo ' '
 	$(MAKE) --no-print-directory post-build
@@ -47,7 +47,7 @@ clean:
 post-build:
 	-@echo 'Generating hex and Printing size information:'
 	arm-none-eabi-objcopy -O ihex "LoRaNode.elf" "LoRaNode.hex"
-	arm-none-eabi-size "LoRaNode.elf"
+	arm-none-eabi-size --format=sysv "LoRaNode.elf"
 	-@echo ' '
 
 .PHONY: all clean dependents

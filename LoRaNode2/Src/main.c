@@ -76,6 +76,7 @@ UART_HandleTypeDef huart2;
 extern uint8_t data[PAYLOAD_LENGTH];
 uint8_t measureMode = OFF;
 uint16_t sample = 0;
+uint8_t sig = 0;
 uint32_t time = 0;
 uint8_t tempOutput[3];
 /* USER CODE END PV */
@@ -582,15 +583,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim->Instance == TIM2)
     {
         /* End ADC sampling */
-        if (sample >= 1024) {
+        if ((sample >= SAMPLES) && (sig >= SIGNALS)) {
             measureMode = VIBE_DONE;
             sample = 0;
+            sig = 0;
             return;
+        }
+
+        if ((sample >= SAMPLES) && (sig < SIGNALS)) {
+        	sample = 0;
+        	sig++;
         }
 
         if (measureMode != VIBE_DONE) {
             /* Capture ADC samples */
-            ADC_fill_buffer(sample);
+            ADC_fill_buffer(sample, sig);
             sample++;
         }
     }
@@ -605,6 +612,7 @@ void process_measurements(void) {
 
     /* Initializes timer for vibration sensor */
     if (measureMode == OFF) {
+    	make_sig_array();
         MX_TIM2_Init();
         measureMode = VIBE_CAP;
         return;
@@ -616,6 +624,7 @@ void process_measurements(void) {
     /* Deinitializes timer for vibration sensor */
     if (measureMode == VIBE_DONE) {
         HAL_TIM_Base_DeInit(&htim2);
+        signal_averaging();
         measureMode = VIBE_FFT;
 
         return;

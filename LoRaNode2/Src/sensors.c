@@ -40,6 +40,7 @@
 #include <stdarg.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "sx1272.h"
 
@@ -51,6 +52,8 @@ extern I2C_HandleTypeDef hi2c1;
 ** Global Variables
 ** ------------------------------------------------------------------- */
 uint8_t adcBuffer[SAMPLES];
+uint8_t ave_sig[SAMPLES];
+uint8_t raw_signals[SAMPLES * SIGNALS];
 float32_t fftInput[FFT_SAMPLES];
 uint8_t vibrationOutput[VIBE_SIZE];
 float32_t dspOut[FFT_SIZE];
@@ -73,6 +76,18 @@ const float32_t firCoeffs32[NUM_TAPS] = {
 /* ----------------------------------------------------------------------
 ** Function Prototypes
 ** ------------------------------------------------------------------- */
+
+/**
+ * @brief  Sets signal array for averaging signals
+ * @param  None
+ * @retval None
+ */
+void make_sig_array(void) {
+
+	for (uint16_t i = 0; i < SAMPLES; i++) {
+		ave_sig[i] = 0;
+	}
+}
 
 /**
  * @brief  Return ADC value from ADC buffer at specified position
@@ -170,9 +185,37 @@ uint8_t ADC_get(void) {
  * @param  uint16_t pos < SAMPLES
  * @retval None
  */
-void ADC_fill_buffer(uint16_t pos) {
-    adcBuffer[pos] = ADC_get();
+void ADC_fill_buffer(uint16_t col, uint8_t row) {
+//    adcBuffer[pos] = ADC_get();
+
+	*(raw_signals + row*SAMPLES + col) = ADC_get();
 }
+
+/**
+ * @brief  Function to remove noise by signal averaging
+ * @param  None
+ * @retval None
+ */
+void signal_averaging(void) {
+
+	for (uint16_t j = 0; j < SAMPLES; j++) {
+
+		for (uint8_t i = 0; i < SIGNALS; i++) {
+
+			ave_sig [j] = ave_sig[j] + *(raw_signals + i*SAMPLES + j);
+		}
+
+		ave_sig[j] = ave_sig[j] / 10;
+   }
+
+	for (int i = 0; i < 1024; i++) {
+		adcBuffer[i] = ave_sig[i];
+	}
+
+//	free(ave_sig);
+//	free(raw_signals);
+}
+
 
 void log_temp(void) {
     uint8_t ts[2];
