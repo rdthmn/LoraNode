@@ -30,7 +30,7 @@ void vibe_fft(void);
 void vibe_filter(void);
 void log_temp(void);
 void set_payload(void);
-uint8_t convert_to_temp(uint8_t *tsVal);
+uint8_t convert_to_temp(uint8_t *tsVal, uint8_t sensor);
 
 #endif /* BOARD_BOARD_H_ */
 

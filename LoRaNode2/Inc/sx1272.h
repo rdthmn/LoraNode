@@ -75,7 +75,7 @@
 
 
 #define MAX_PACKET_LENGTH                           255
-#define PAYLOAD_LENGTH                              108
+#define PAYLOAD_LENGTH                              110
 #define HEADER_LENGTH                               2
 #define CRC_LENGTH                                  2
 

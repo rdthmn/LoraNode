@@ -63,6 +63,7 @@ uint32_t numBlocks = FFT_SIZE/BLOCK_SIZE;
 static float32_t firStateF32[BLOCK_SIZE + NUM_TAPS - 1];
 static uint8_t adcValue = 0;
 uint8_t ts[2], data[PAYLOAD_LENGTH];
+uint8_t sigALERT = 0, tempALERT;
 extern uint8_t tempOutput[3];
 //FIR filter coefficients calculated in MATLAB using fir1(20, 2kHz/10kHz/2)
 const float32_t firCoeffs32[NUM_TAPS] = {
@@ -109,12 +110,9 @@ void vibe_filter(void) {
 	arm_fir_instance_f32 Filt;
 
 	/* Offset DC component and scale up values from ADC data */
-	printf("\n\r");
 	for (int i = 0; i < SAMPLES; i++) {
-		printf("%d ", ADC_get_buffer(i));
 		filtInput[i] = ((float32_t)ADC_get_buffer(i) - 127);
 	}
-	printf("\n\r");
 
 	/* Call FIR init function to initialize the instance structure. */
 	arm_fir_init_f32(&Filt, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize);
@@ -154,7 +152,11 @@ void vibe_fft(void) {
 
 	/* Set up package of 105 samples*/
 	for (int i = 0; i < 105; i++) {
-		vibrationOutput[i] = (uint8_t)(dspOut[i]/256);
+		vibrationOutput[i] = 0;//(uint8_t)(dspOut[i]/256);
+		vibrationOutput[40] = 126;
+		if (vibrationOutput[i] >= 127) {
+			sigALERT = 1;
+		}
 	}
 	/* Remove DC - 50Hz frequency content */
 	for (int i = 0; i < 1; i++) {
@@ -186,7 +188,6 @@ uint8_t ADC_get(void) {
  * @retval None
  */
 void ADC_fill_buffer(uint16_t col, uint8_t row) {
-//    adcBuffer[pos] = ADC_get();
 
 	*(raw_signals + row*SAMPLES + col) = ADC_get();
 }
@@ -212,8 +213,6 @@ void signal_averaging(void) {
 		adcBuffer[i] = ave_sig[i];
 	}
 
-//	free(ave_sig);
-//	free(raw_signals);
 }
 
 
@@ -221,20 +220,25 @@ void log_temp(void) {
     uint8_t ts[2];
 
     HAL_I2C_Mem_Read(&hi2c1, 0x51 << 1, 0x7, 1, ts, 2, 100);
-    tempOutput[0] = convert_to_temp(ts);
+    tempOutput[0] = convert_to_temp(ts, 0);
 
     HAL_I2C_Mem_Read(&hi2c1, 0x52 << 1, 0x7, 1, ts, 2, 100);
-    tempOutput[1] = convert_to_temp(ts);
+    tempOutput[1] = convert_to_temp(ts, 1);
 
     HAL_I2C_Mem_Read(&hi2c1, 0x53 << 1, 0x7, 1, ts, 2, 100);
-    tempOutput[2] = convert_to_temp(ts);
+    tempOutput[2] = convert_to_temp(ts, 2);
 }
 
-uint8_t convert_to_temp(uint8_t *tsVal) {
+uint8_t convert_to_temp(uint8_t *tsVal, uint8_t sensor) {
     float temp = 0.0;
 
     temp = (tsVal[1] << 8) | tsVal[0];
     temp = temp * 0.02 - 273.15;
+
+    temp = 41;
+    if (temp > 40) {
+    	tempALERT = tempALERT | (1 << sensor);
+    }
 
     return (uint8_t) temp;
 }
@@ -255,5 +259,8 @@ void set_payload(void) {
     for(int i = 0; i < VIBE_SIZE; i++) {
         data[i + NUM_TEMP_SENSORS] = vibrationOutput[i];
     }
+
+    data[PAYLOAD_LENGTH - 2] = tempALERT;
+    data[PAYLOAD_LENGTH - 1] = sigALERT;
 
 }

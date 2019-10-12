@@ -74,6 +74,8 @@ UART_HandleTypeDef huart2;
 #define NUM_TEMP_SENSORS        3
 
 extern uint8_t data[PAYLOAD_LENGTH];
+extern uint8_t sigALERT, tempALERT;
+uint8_t timPrescaler = 95, recap = 0;
 uint8_t measureMode = OFF;
 uint16_t sample = 0;
 uint8_t sig = 0;
@@ -151,7 +153,8 @@ int main(void)
 	  if (measureMode == SLEEP_MODE) {
 		  HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
 
-		  HAL_Delay(100);
+		  HAL_Delay(500);
+
 		  HAL_SuspendTick();
 		  HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);
 
@@ -562,7 +565,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == GPIO_PIN_13) {
-        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+        HAL_GPIO_TogglePin(GPIOA, LED_Pin);
     } else {
         ;
     }
@@ -655,7 +658,19 @@ void process_measurements(void) {
     /* Send pay load */
     if (measureMode == SEND_PACKET) {
         sx1272_send(UUID, data, PAYLOAD_LENGTH + HEADER_LENGTH, 1, 100);
-		measureMode = SLEEP_MODE;
+
+        if ((!sigALERT && !tempALERT) || (recap >= 5)) {
+        	timPrescaler = 95;
+        	recap = 0;
+        	measureMode = SLEEP_MODE;
+        } else {
+        	sigALERT = 0;
+        	tempALERT = 0;
+        	timPrescaler = 49;
+        	recap++;
+        	measureMode = OFF;
+        	return;
+        }
     }
 
     return;
