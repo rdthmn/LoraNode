@@ -52,7 +52,7 @@ extern I2C_HandleTypeDef hi2c1;
 ** Global Variables
 ** ------------------------------------------------------------------- */
 uint8_t adcBuffer[SAMPLES];
-uint8_t ave_sig[SAMPLES];
+uint16_t ave_sig[SAMPLES];
 uint8_t raw_signals[SAMPLES * SIGNALS];
 float32_t fftInput[FFT_SAMPLES];
 uint8_t vibrationOutput[VIBE_SIZE];
@@ -66,14 +66,21 @@ uint8_t ts[2], data[PAYLOAD_LENGTH];
 uint8_t sigALERT = 0, tempALERT;
 extern uint8_t tempOutput[3];
 //FIR filter coefficients calculated in MATLAB using fir1(20, 2kHz/10kHz/2)
-const float32_t firCoeffs32[NUM_TAPS] = {
+const float32_t firCoeffs_10k[NUM_TAPS] = {
 		0.0, -0.00212227114882539, -0.00632535399151418, -0.0116118103776210, -0.0123546567489824,
 		0.0, 0.0317744975585673, 0.0814359075642177, 0.137493781701943, 0.182125490388735,
 		0.199168830106960, 0.182125490388735, 0.137493781701943, 0.0814359075642177, 0.0317744975585673,
 		0.0, -0.0123546567489824, -0.0116118103776210, -0.00632535399151418, -0.00212227114882539,
 		0.0
 };
-
+//FIR filter coefficients calculated in MATLAB using fir1(20, 2kHz/5kHz/2)
+const float32_t firCoeffs_5k[NUM_TAPS] = {
+		0.0, -0.00213260700731174, 0.00635615965165261, -0.0116683620717341, 0.0124148262442306, 0.0,
+		-0.0319292453203798, 0.0818325157058101, -0.138163402203174, 0.183012475681098, 0.800555278639617,
+		0.183012475681098, -0.138163402203174, 0.0818325157058101, -0.0319292453203798, 0.0,
+		0.0124148262442306, -0.0116683620717341, 0.00635615965165261, -0.00213260700731174,
+		0.0
+};
 /* ----------------------------------------------------------------------
 ** Function Prototypes
 ** ------------------------------------------------------------------- */
@@ -114,8 +121,12 @@ void vibe_filter(void) {
 		filtInput[i] = ((float32_t)ADC_get_buffer(i) - 127);
 	}
 
-	/* Call FIR init function to initialize the instance structure. */
-	arm_fir_init_f32(&Filt, NUM_TAPS, (float32_t *)&firCoeffs32[0], &firStateF32[0], blockSize);
+	if (sigALERT) {
+		/* Call FIR init function to initialize the instance structure. */
+		arm_fir_init_f32(&Filt, NUM_TAPS, (float32_t *)&firCoeffs_10k[0], &firStateF32[0], blockSize);
+	} else {
+		arm_fir_init_f32(&Filt, NUM_TAPS, (float32_t *)&firCoeffs_5k[0], &firStateF32[0], blockSize);
+	}
 
 	/* Call the FIR process function for every blockSize samples */
 	for(uint32_t i=0; i < numBlocks; i++) {
@@ -151,15 +162,34 @@ void vibe_fft(void) {
 	arm_cmplx_mag_f32(fftInput, dspOut, FFT_SIZE);
 
 	/* Set up package of 105 samples*/
-	for (int i = 0; i < 105; i++) {
-		vibrationOutput[i] = 0;//(uint8_t)(dspOut[i]/256);
-		vibrationOutput[40] = 126;
-		if (vibrationOutput[i] >= 127) {
-			sigALERT = 1;
+	if (sigALERT) {
+		for (int i = 0; i < 105; i++) {
+			vibrationOutput[i] = (uint8_t)(dspOut[i]/256);
+
+			if (vibrationOutput[i] >= 6) {
+				sigALERT = 1;
+			}
+		}
+	} else {
+		for (int i = 0; i < 105; i++) {
+
+			uint8_t vibr1 = (uint8_t)(dspOut[2*i]/256);
+			uint8_t vibr2 = (uint8_t)(dspOut[2*i-1]/256);
+
+			if (vibr1 > vibr2) {
+				vibrationOutput[i] = vibr1;
+			} else {
+				vibrationOutput[i] = vibr2;
+			}
+
+			if (vibrationOutput[i] >= 6) {
+				sigALERT = 1;
+			}
 		}
 	}
+
 	/* Remove DC - 50Hz frequency content */
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 4; i++) {
 		vibrationOutput[i] = 0;
 	}
 }
@@ -210,7 +240,7 @@ void signal_averaging(void) {
    }
 
 	for (int i = 0; i < 1024; i++) {
-		adcBuffer[i] = ave_sig[i];
+		adcBuffer[i] = (uint8_t) ave_sig[i];
 	}
 
 }
@@ -235,8 +265,7 @@ uint8_t convert_to_temp(uint8_t *tsVal, uint8_t sensor) {
     temp = (tsVal[1] << 8) | tsVal[0];
     temp = temp * 0.02 - 273.15;
 
-    temp = 41;
-    if (temp > 40) {
+    if (temp > 36) {
     	tempALERT = tempALERT | (1 << sensor);
     }
 
@@ -252,7 +281,7 @@ void set_payload(void) {
 
     /*Pack Temperature data*/
     for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
-        data[i] = tempOutput[i];
+        data[i] = 32;
     }
 
     /*Pack vibration data*/
@@ -260,7 +289,6 @@ void set_payload(void) {
         data[i + NUM_TEMP_SENSORS] = vibrationOutput[i];
     }
 
-    data[PAYLOAD_LENGTH - 2] = tempALERT;
-    data[PAYLOAD_LENGTH - 1] = sigALERT;
-
+    data[PAYLOAD_LENGTH - 2] = 108;
+    data[PAYLOAD_LENGTH - 1] = 109;
 }

@@ -75,7 +75,7 @@ UART_HandleTypeDef huart2;
 
 extern uint8_t data[PAYLOAD_LENGTH];
 extern uint8_t sigALERT, tempALERT;
-uint8_t timPrescaler = 95, recap = 0;
+uint8_t timPrescaler = 92, recap = 0;
 uint8_t measureMode = OFF;
 uint16_t sample = 0;
 uint8_t sig = 0;
@@ -448,7 +448,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 95;
+  htim2.Init.Prescaler = timPrescaler;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 16;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1; // Check division here
@@ -660,13 +660,13 @@ void process_measurements(void) {
         sx1272_send(UUID, data, PAYLOAD_LENGTH + HEADER_LENGTH, 1, 100);
 
         if ((!sigALERT && !tempALERT) || (recap >= 5)) {
-        	timPrescaler = 95;
+        	timPrescaler = 92;
         	recap = 0;
         	measureMode = SLEEP_MODE;
         } else {
         	sigALERT = 0;
         	tempALERT = 0;
-        	timPrescaler = 49;
+        	timPrescaler = 46;
         	recap++;
         	measureMode = OFF;
         	return;
