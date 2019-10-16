@@ -162,11 +162,14 @@ void vibe_fft(void) {
 	arm_cmplx_mag_f32(fftInput, dspOut, FFT_SIZE);
 
 	/* Set up package of 105 samples*/
+	for (int i = 0; i < 105; i++) {
+		vibrationOutput[i] = 0;
+	}
 	if (sigALERT) {
 		for (int i = 0; i < 105; i++) {
 			vibrationOutput[i] = (uint8_t)(dspOut[i]/256);
 
-			if (vibrationOutput[i] >= 6) {
+			if ((vibrationOutput[i] >= 6) && (i > 4)) {
 				sigALERT = 1;
 			}
 		}
@@ -182,7 +185,7 @@ void vibe_fft(void) {
 				vibrationOutput[i] = vibr2;
 			}
 
-			if (vibrationOutput[i] >= 6) {
+			if ((vibrationOutput[i] >= 6) && (i > 4)) {
 				sigALERT = 1;
 			}
 		}
@@ -281,7 +284,7 @@ void set_payload(void) {
 
     /*Pack Temperature data*/
     for (int i = 0; i < NUM_TEMP_SENSORS; i++) {
-        data[i] = 32;
+        data[i] = tempOutput[i];
     }
 
     /*Pack vibration data*/
@@ -289,6 +292,6 @@ void set_payload(void) {
         data[i + NUM_TEMP_SENSORS] = vibrationOutput[i];
     }
 
-    data[PAYLOAD_LENGTH - 2] = 108;
-    data[PAYLOAD_LENGTH - 1] = 109;
+    data[PAYLOAD_LENGTH - 2] = tempALERT;
+    data[PAYLOAD_LENGTH - 1] = sigALERT;
 }
